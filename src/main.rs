@@ -64,11 +64,13 @@ struct Book {
 enum BookItem {
     Chapter(Chapter),
     Separator,
+    #[allow(unused)]
     PartTitle(String),
 }
 
 #[derive(Debug, Deserialize)]
 struct Chapter {
+    #[allow(unused)]
     name: String,
     /// Relative path from the book's source directory (e.g. "chapter_1.md").
     /// `None` for draft chapters.
