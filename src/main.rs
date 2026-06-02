@@ -306,7 +306,7 @@ fn run() -> Result<()> {
             std::process::exit(0);
         } else {
             // For any other renderer, we still support being a co-backend.
-            std::process::exit(0);
+            std::process::exit(1);
         }
     }
 
