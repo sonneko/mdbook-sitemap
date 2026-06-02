@@ -219,7 +219,7 @@ fn path_to_html(path: &PathBuf) -> String {
         return format!("{}.html", &normalized[..normalized.len() - 3]);
     }
 
-    normalized.into_owned()
+    normalized.to_owned()
 }
 
 /// Render the sitemap XML string.
