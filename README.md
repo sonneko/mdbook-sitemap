@@ -7,7 +7,11 @@ This tool is an mdBook backend that automatically generates a sitemap.xml
 file when `mdbook build` is run. It reads the book structure from stdin
 (as JSON provided by mdbook) and writes sitemap.xml to the output directory.
 
-# Usage in book.toml
+# Usage
+
+```bash
+$ cargo install mdbook-sitemap
+```
 
 ```toml
 [output.html]
