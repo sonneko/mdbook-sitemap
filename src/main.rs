@@ -23,7 +23,7 @@ use clap::Parser;
 use serde::Deserialize;
 use std::fs;
 use std::io::{self, Read};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // ─── mdBook JSON data structures ────────────────────────────────────────────
 
@@ -56,11 +56,10 @@ impl RenderContext {
 
 #[derive(Debug, Deserialize)]
 struct Book {
-    sections: Vec<BookItem>,
+    items: Vec<BookItem>,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(untagged)]
 enum BookItem {
     Chapter(Chapter),
     Separator,
@@ -70,8 +69,6 @@ enum BookItem {
 
 #[derive(Debug, Deserialize)]
 struct Chapter {
-    #[allow(unused)]
-    name: String,
     /// Relative path from the book's source directory (e.g. "chapter_1.md").
     /// `None` for draft chapters.
     path: Option<PathBuf>,
@@ -117,12 +114,13 @@ impl Default for SitemapConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 enum ChangeFreq {
     Always,
     Hourly,
     Daily,
+    #[default]
     Weekly,
     Monthly,
     Yearly,
@@ -141,12 +139,6 @@ impl std::fmt::Display for ChangeFreq {
             ChangeFreq::Never => "never",
         };
         write!(f, "{}", s)
-    }
-}
-
-impl Default for ChangeFreq {
-    fn default() -> Self {
-        ChangeFreq::Weekly
     }
 }
 
@@ -174,12 +166,7 @@ struct Cli {
 // ─── Sitemap generation ──────────────────────────────────────────────────────
 
 /// Collect all chapter URLs recursively.
-fn collect_urls(
-    items: &[BookItem],
-    base_url: &str,
-    include_draft: bool,
-    urls: &mut Vec<String>,
-) {
+fn collect_urls(items: &[BookItem], base_url: &str, include_draft: bool, urls: &mut Vec<String>) {
     for item in items {
         match item {
             BookItem::Chapter(ch) => {
@@ -204,7 +191,7 @@ fn collect_urls(
 /// Convert a .md file path to the corresponding .html path that mdbook outputs.
 /// e.g. "chapter_1.md" → "chapter_1.html"
 ///      "sub/README.md" → "sub/index.html"  (mdbook converts README.md → index.html)
-fn path_to_html(path: &PathBuf) -> String {
+fn path_to_html(path: &Path) -> String {
     let s = path.to_string_lossy();
 
     // Handle Windows-style path separators.
@@ -231,9 +218,7 @@ fn build_sitemap(urls: &[String], cfg: &SitemapConfig) -> String {
 
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
     xml.push('\n');
-    xml.push_str(
-        r#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"#,
-    );
+    xml.push_str(r#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"#);
     xml.push('\n');
 
     for url in urls {
@@ -314,10 +299,11 @@ fn run() -> Result<()> {
 
     // Normal invocation: read RenderContext from stdin.
     let mut stdin = io::stdin();
-    let ctx = RenderContext::from_json(&mut stdin)
-        .context("Failed to read RenderContext from stdin.\n\
+    let ctx = RenderContext::from_json(&mut stdin).context(
+        "Failed to read RenderContext from stdin.\n\
                   This program is meant to be invoked by `mdbook build`.\n\
-                  Add `[output.sitemap]` to your book.toml to use it.")?;
+                  Add `[output.sitemap]` to your book.toml to use it.",
+    )?;
 
     eprintln!(
         "[mdbook-sitemap] mdBook version: {}, root: {}",
@@ -359,7 +345,7 @@ fn run() -> Result<()> {
 
     // Collect all chapter URLs.
     let mut urls: Vec<String> = Vec::new();
-    collect_urls(&ctx.book.sections, &base_url, cfg.include_draft, &mut urls);
+    collect_urls(&ctx.book.items, &base_url, cfg.include_draft, &mut urls);
 
     if urls.is_empty() {
         eprintln!(
@@ -380,9 +366,8 @@ fn run() -> Result<()> {
     })?;
 
     let output_path = ctx.destination.join(&cfg.output_filename);
-    fs::write(&output_path, &sitemap_xml).with_context(|| {
-        format!("Failed to write sitemap to: {}", output_path.display())
-    })?;
+    fs::write(&output_path, &sitemap_xml)
+        .with_context(|| format!("Failed to write sitemap to: {}", output_path.display()))?;
 
     eprintln!(
         "[mdbook-sitemap] Generated {} ({} URLs) → {}",
@@ -410,10 +395,7 @@ fn run() -> Result<()> {
                 e
             );
         } else {
-            eprintln!(
-                "[mdbook-sitemap] Also copied → {}",
-                html_sitemap.display()
-            );
+            eprintln!("[mdbook-sitemap] Also copied → {}", html_sitemap.display());
         }
     }
 
@@ -435,7 +417,10 @@ mod tests {
 
     #[test]
     fn test_path_to_html_md() {
-        assert_eq!(path_to_html(&PathBuf::from("chapter_1.md")), "chapter_1.html");
+        assert_eq!(
+            path_to_html(&PathBuf::from("chapter_1.md")),
+            "chapter_1.html"
+        );
     }
 
     #[test]
@@ -504,17 +489,14 @@ mod tests {
     fn test_collect_urls_basic() {
         let items = vec![
             BookItem::Chapter(Chapter {
-                name: "Introduction".into(),
                 path: Some(PathBuf::from("intro.md")),
                 sub_items: vec![],
                 is_draft: false,
             }),
             BookItem::Separator,
             BookItem::Chapter(Chapter {
-                name: "Chapter 1".into(),
                 path: Some(PathBuf::from("chapter1.md")),
                 sub_items: vec![BookItem::Chapter(Chapter {
-                    name: "Sub Chapter".into(),
                     path: Some(PathBuf::from("chapter1/sub.md")),
                     sub_items: vec![],
                     is_draft: false,
@@ -534,13 +516,11 @@ mod tests {
     fn test_collect_urls_skips_draft() {
         let items = vec![
             BookItem::Chapter(Chapter {
-                name: "Real Chapter".into(),
                 path: Some(PathBuf::from("real.md")),
                 sub_items: vec![],
                 is_draft: false,
             }),
             BookItem::Chapter(Chapter {
-                name: "Draft Chapter".into(),
                 path: None,
                 sub_items: vec![],
                 is_draft: true,
@@ -554,14 +534,11 @@ mod tests {
 
     #[test]
     fn test_collect_urls_includes_draft_when_configured() {
-        let items = vec![
-            BookItem::Chapter(Chapter {
-                name: "Draft Chapter".into(),
-                path: Some(PathBuf::from("draft.md")),
-                sub_items: vec![],
-                is_draft: true,
-            }),
-        ];
+        let items = vec![BookItem::Chapter(Chapter {
+            path: Some(PathBuf::from("draft.md")),
+            sub_items: vec![],
+            is_draft: true,
+        })];
         let mut urls_without = Vec::new();
         collect_urls(&items, "https://example.com/", false, &mut urls_without);
         // is_draft=true but path exists: since is_draft check uses is_draft field

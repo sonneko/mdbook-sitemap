@@ -1,5 +1,8 @@
 # mdbook-sitemap
 
+[![Crates.io](https://img.shields.io/crates/v/mdbook-sitemap.svg)](https://crates.io/crates/mdbook-sitemap)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Tool to generate a sitemap.xml file for an mdbook project
 
 This tool is an mdBook backend that automatically generates a sitemap.xml
@@ -9,9 +12,13 @@ file when `mdbook build` is run. It reads the book structure from stdin
 
 # Usage
 
+1. Install `mdbook-sitemap`
+
 ```bash
-$ cargo install mdbook-sitemap
+cargo install mdbook-sitemap
 ```
+
+2. Add config to your `Book.toml`
 
 ```toml
 [output.html]
