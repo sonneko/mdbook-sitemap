@@ -171,12 +171,12 @@ fn collect_urls(items: &[BookItem], base_url: &str, include_draft: bool, urls: &
         match item {
             BookItem::Chapter(ch) => {
                 // Only add chapters that have a path (i.e. not draft-only).
-                if !ch.is_draft || include_draft {
-                    if let Some(ref path) = ch.path {
-                        let html_path = path_to_html(path);
-                        let url = format!("{}{}", base_url, html_path);
-                        urls.push(url);
-                    }
+                if (!ch.is_draft || include_draft)
+                    && let Some(ref path) = ch.path
+                {
+                    let html_path = path_to_html(path);
+                    let url = format!("{}{}", base_url, html_path);
+                    urls.push(url);
                 }
                 // Recurse into sub-chapters.
                 if !ch.sub_items.is_empty() {

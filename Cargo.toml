@@ -1,7 +1,8 @@
 [package]
 name = "mdbook-sitemap"
 version = "0.1.2"
-edition = "2021"
+rust-version = "1.88"
+edition = "2024"
 description = "A sitemap.xml generator backend for mdBook"
 license = "MIT"
 repository = "https://github.com/sonneko/mdbook-sitemap"
@@ -14,10 +15,10 @@ name = "mdbook-sitemap"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1.0.102"
-clap = { version = "4.6.1", features = ["derive"] }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [dev-dependencies]
 tempfile = "3"
