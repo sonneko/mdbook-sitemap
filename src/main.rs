@@ -187,7 +187,7 @@ fn collect_chapter_urls(
             BookItem::Chapter(ch) => {
                 // Only add chapters that have a path (i.e. not draft-only).
                 if (!ch.is_draft || include_draft)
-                    && let Some(ref path) = ch.path 
+                    && let Some(ref path) = ch.path
                 {
                     let html_path = path_to_html(path);
                     // mdBook's root index.html is an alias of the book's base URL.
