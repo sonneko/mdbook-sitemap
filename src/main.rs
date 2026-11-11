@@ -21,6 +21,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use serde::Deserialize;
+use std::collections::HashSet;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -165,22 +166,41 @@ struct Cli {
 
 // ─── Sitemap generation ──────────────────────────────────────────────────────
 
-/// Collect all chapter URLs recursively.
-fn collect_urls(items: &[BookItem], base_url: &str, include_draft: bool, urls: &mut Vec<String>) {
+/// Collect the base URL and all unique chapter URLs recursively.
+fn collect_urls(items: &[BookItem], base_url: &str, include_draft: bool) -> Vec<String> {
+    let mut urls = vec![base_url.to_owned()];
+    let mut seen = HashSet::new();
+    seen.insert(base_url.to_owned());
+    collect_chapter_urls(items, base_url, include_draft, &mut urls, &mut seen);
+    urls
+}
+
+fn collect_chapter_urls(
+    items: &[BookItem],
+    base_url: &str,
+    include_draft: bool,
+    urls: &mut Vec<String>,
+    seen: &mut HashSet<String>,
+) {
     for item in items {
         match item {
             BookItem::Chapter(ch) => {
                 // Only add chapters that have a path (i.e. not draft-only).
                 if (!ch.is_draft || include_draft)
-                    && let Some(ref path) = ch.path
+                    && let Some(ref path) = ch.path 
                 {
                     let html_path = path_to_html(path);
-                    let url = format!("{}{}", base_url, html_path);
-                    urls.push(url);
+                    // mdBook's root index.html is an alias of the book's base URL.
+                    if html_path != "index.html" {
+                        let url = format!("{}{}", base_url, html_path);
+                        if seen.insert(url.clone()) {
+                            urls.push(url);
+                        }
+                    }
                 }
                 // Recurse into sub-chapters.
                 if !ch.sub_items.is_empty() {
-                    collect_urls(&ch.sub_items, base_url, include_draft, urls);
+                    collect_chapter_urls(&ch.sub_items, base_url, include_draft, urls, seen);
                 }
             }
             BookItem::Separator | BookItem::PartTitle(_) => {}
@@ -343,14 +363,13 @@ fn run() -> Result<()> {
         }
     };
 
-    // Collect all chapter URLs.
-    let mut urls: Vec<String> = Vec::new();
-    collect_urls(&ctx.book.items, &base_url, cfg.include_draft, &mut urls);
+    // Include the book's base URL and collect its chapter URLs.
+    let urls = collect_urls(&ctx.book.items, &base_url, cfg.include_draft);
 
-    if urls.is_empty() {
+    if urls.len() == 1 {
         eprintln!(
             "[mdbook-sitemap] Warning: no chapters found. \
-             The sitemap will be empty."
+             The sitemap will contain only the base URL."
         );
     }
 
@@ -467,7 +486,7 @@ mod tests {
     #[test]
     fn test_build_sitemap() {
         let urls = vec![
-            "https://example.com/docs/index.html".to_string(),
+            "https://example.com/docs/".to_string(),
             "https://example.com/docs/chapter_1.html".to_string(),
         ];
         let cfg = SitemapConfig {
@@ -478,8 +497,9 @@ mod tests {
         let xml = build_sitemap(&urls, &cfg);
         assert!(xml.contains(r#"<?xml version="1.0" encoding="UTF-8"?>"#));
         assert!(xml.contains(r#"xmlns="http://www.sitemaps.org/schemas/sitemap/0.9""#));
-        assert!(xml.contains("<loc>https://example.com/docs/index.html</loc>"));
+        assert!(xml.contains("<loc>https://example.com/docs/</loc>"));
         assert!(xml.contains("<loc>https://example.com/docs/chapter_1.html</loc>"));
+        assert!(!xml.contains("https://example.com/docs/index.html"));
         assert!(xml.contains("<changefreq>weekly</changefreq>"));
         assert!(xml.contains("<priority>0.7</priority>"));
         assert!(!xml.contains("<lastmod>"));
@@ -504,12 +524,12 @@ mod tests {
                 is_draft: false,
             }),
         ];
-        let mut urls = Vec::new();
-        collect_urls(&items, "https://example.com/", false, &mut urls);
-        assert_eq!(urls.len(), 3);
-        assert_eq!(urls[0], "https://example.com/intro.html");
-        assert_eq!(urls[1], "https://example.com/chapter1.html");
-        assert_eq!(urls[2], "https://example.com/chapter1/sub.html");
+        let urls = collect_urls(&items, "https://example.com/", false);
+        assert_eq!(urls.len(), 4);
+        assert_eq!(urls[0], "https://example.com/");
+        assert_eq!(urls[1], "https://example.com/intro.html");
+        assert_eq!(urls[2], "https://example.com/chapter1.html");
+        assert_eq!(urls[3], "https://example.com/chapter1/sub.html");
     }
 
     #[test]
@@ -526,10 +546,10 @@ mod tests {
                 is_draft: true,
             }),
         ];
-        let mut urls = Vec::new();
-        collect_urls(&items, "https://example.com/", false, &mut urls);
-        assert_eq!(urls.len(), 1);
-        assert_eq!(urls[0], "https://example.com/real.html");
+        let urls = collect_urls(&items, "https://example.com/", false);
+        assert_eq!(urls.len(), 2);
+        assert_eq!(urls[0], "https://example.com/");
+        assert_eq!(urls[1], "https://example.com/real.html");
     }
 
     #[test]
@@ -539,15 +559,60 @@ mod tests {
             sub_items: vec![],
             is_draft: true,
         })];
-        let mut urls_without = Vec::new();
-        collect_urls(&items, "https://example.com/", false, &mut urls_without);
+        let urls_without = collect_urls(&items, "https://example.com/", false);
         // is_draft=true but path exists: since is_draft check uses is_draft field
         // if include_draft is false, draft chapters are skipped
-        assert_eq!(urls_without.len(), 0);
+        assert_eq!(urls_without, vec!["https://example.com/".to_string()]);
 
-        let mut urls_with = Vec::new();
-        collect_urls(&items, "https://example.com/", true, &mut urls_with);
-        assert_eq!(urls_with.len(), 1);
+        let urls_with = collect_urls(&items, "https://example.com/", true);
+        assert_eq!(
+            urls_with,
+            vec![
+                "https://example.com/".to_string(),
+                "https://example.com/draft.html".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_collect_urls_uses_base_skips_root_index_and_deduplicates() {
+        let items = vec![
+            BookItem::Chapter(Chapter {
+                path: Some(PathBuf::from("README.md")),
+                sub_items: vec![],
+                is_draft: false,
+            }),
+            BookItem::Chapter(Chapter {
+                path: Some(PathBuf::from("index.md")),
+                sub_items: vec![],
+                is_draft: false,
+            }),
+            BookItem::Chapter(Chapter {
+                path: Some(PathBuf::from("guide/README.md")),
+                sub_items: vec![],
+                is_draft: false,
+            }),
+            BookItem::Chapter(Chapter {
+                path: Some(PathBuf::from("page.md")),
+                sub_items: vec![],
+                is_draft: false,
+            }),
+            BookItem::Chapter(Chapter {
+                path: Some(PathBuf::from("page.md")),
+                sub_items: vec![],
+                is_draft: false,
+            }),
+        ];
+
+        let urls = collect_urls(&items, "https://example.com/docs/", false);
+        assert_eq!(
+            urls,
+            vec![
+                "https://example.com/docs/".to_string(),
+                "https://example.com/docs/guide/index.html".to_string(),
+                "https://example.com/docs/page.html".to_string(),
+            ]
+        );
     }
 
     #[test]

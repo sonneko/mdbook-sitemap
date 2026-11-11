@@ -1,0 +1,79 @@
+name: Verify release tag and tests
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: cargo-dist release plan JSON
+        required: true
+        type: string
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: Verify tag and tests
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      DIST_TAG: ${{ fromJson(inputs.plan).announcement_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2.9.3
+      - name: Install mdBook
+        uses: taiki-e/install-action@v2.90.3
+        with:
+          tool: mdbook@0.5.4
+          fallback: none
+      - name: Verify release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Expected a stable vMAJOR.MINOR.PATCH tag; got '$RELEASE_TAG'."
+            exit 1
+          fi
+
+          if [[ "$DIST_TAG" != "$RELEASE_TAG" ]]; then
+            echo "::error::cargo-dist planned '$DIST_TAG', but the pushed tag is '$RELEASE_TAG'."
+            exit 1
+          fi
+
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "::error::Tag commit $GITHUB_SHA is not contained in origin/main."
+            exit 1
+          fi
+
+          version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
+          expected_tag="v${version}"
+          if [[ "$RELEASE_TAG" != "$expected_tag" ]]; then
+            echo "::error::Tag '$RELEASE_TAG' does not match Cargo.toml version '$version' (expected '$expected_tag')."
+            exit 1
+          fi
+
+          echo "Verified $RELEASE_TAG at $GITHUB_SHA is on origin/main and matches Cargo.toml."
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Build
+        run: cargo build --locked
+      - name: Run tests
+        run: cargo test --locked

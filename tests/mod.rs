@@ -86,8 +86,10 @@ base-url = "https://example.com/docs/"
 
         assert!(sitemap.contains("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"));
         assert!(sitemap.contains("<urlset"));
-        assert!(sitemap.contains("<loc>https://example.com/docs/index.html</loc>"));
+        assert!(sitemap.contains("<loc>https://example.com/docs/</loc>"));
+        assert!(!sitemap.contains("https://example.com/docs/index.html"));
         assert!(sitemap.contains("<loc>https://example.com/docs/first.html</loc>"));
+        assert_eq!(sitemap.matches("<loc>").count(), 2);
     }
 }
 
