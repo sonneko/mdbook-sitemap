@@ -1,0 +1,50 @@
+name: Publish crate to crates.io
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: cargo-dist release plan JSON
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      DIST_TAG: ${{ fromJson(inputs.plan).announcement_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify release plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$DIST_TAG" != "$RELEASE_TAG" ]]; then
+            echo "::error::cargo-dist planned '$DIST_TAG', but the pushed tag is '$RELEASE_TAG'."
+            exit 1
+          fi
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      # crates.io validates the caller's workflow_ref; register release.yml there,
+      # not this reusable workflow's filename.
+      - name: Authenticate with crates.io Trusted Publishing
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1.0.6
+      - name: Publish crate
+        run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

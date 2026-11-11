@@ -38,6 +38,10 @@ base-url = "https://example.com/docs/"
 # include-draft = false           # whether to include draft chapters
 ```
 
+The configured `base-url` is included as the book homepage. The root
+`index.html` alias is omitted so that the homepage appears only once; duplicate
+chapter URLs are also de-duplicated.
+
 ### Licence
 
 MIT license
