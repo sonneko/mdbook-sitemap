@@ -45,7 +45,7 @@ trait Tester: Sized {
             .status()
             .expect("Failed to execute mdbook build. Is mdbook installed globally?");
 
-        println!("{}", status);
+        println!("{status}");
         assert!(status.success(), "mdbook build failed");
 
         // 5. validate generated sitemap.xml

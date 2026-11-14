@@ -22,6 +22,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use serde::Deserialize;
 use std::collections::HashSet;
+use std::fmt::Write;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -70,7 +71,7 @@ enum BookItem {
 
 #[derive(Debug, Deserialize)]
 struct Chapter {
-    /// Relative path from the book's source directory (e.g. "chapter_1.md").
+    /// Relative path from the book's source directory (e.g. "`chapter_1.md`").
     /// `None` for draft chapters.
     path: Option<PathBuf>,
     /// Nested sub-chapters.
@@ -87,7 +88,7 @@ struct Chapter {
 #[derive(Debug, Deserialize)]
 #[serde(default, rename_all = "kebab-case")]
 struct SitemapConfig {
-    /// Base URL of the published book (required, e.g. "https://example.com/").
+    /// Base URL of the published book (required, e.g. <https://example.com/>).
     /// Trailing slash is added automatically if missing.
     base_url: Option<String>,
     /// Default change frequency for all pages (default: "weekly").
@@ -139,7 +140,7 @@ impl std::fmt::Display for ChangeFreq {
             ChangeFreq::Yearly => "yearly",
             ChangeFreq::Never => "never",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -192,7 +193,7 @@ fn collect_chapter_urls(
                     let html_path = path_to_html(path);
                     // mdBook's root index.html is an alias of the book's base URL.
                     if html_path != "index.html" {
-                        let url = format!("{}{}", base_url, html_path);
+                        let url = format!("{base_url}{html_path}");
                         if seen.insert(url.clone()) {
                             urls.push(url);
                         }
@@ -209,7 +210,7 @@ fn collect_chapter_urls(
 }
 
 /// Convert a .md file path to the corresponding .html path that mdbook outputs.
-/// e.g. "chapter_1.md" → "chapter_1.html"
+/// e.g. "`chapter_1.md`" → "`chapter_1.html`"
 ///      "sub/README.md" → "sub/index.html"  (mdbook converts README.md → index.html)
 fn path_to_html(path: &Path) -> String {
     let s = path.to_string_lossy();
@@ -220,15 +221,18 @@ fn path_to_html(path: &Path) -> String {
     // mdBook converts README.md to index.html.
     if normalized.ends_with("/README.md") || normalized == "README.md" {
         let without_readme = normalized.trim_end_matches("README.md");
-        return format!("{}index.html", without_readme);
+        return format!("{without_readme}index.html");
     }
 
     // Replace .md extension with .html.
-    if normalized.ends_with(".md") {
+    if Path::new(&normalized)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("md"))
+    {
         return format!("{}.html", &normalized[..normalized.len() - 3]);
     }
 
-    normalized.to_owned()
+    normalized.clone()
 }
 
 /// Render the sitemap XML string.
@@ -243,15 +247,13 @@ fn build_sitemap(urls: &[String], cfg: &SitemapConfig) -> String {
 
     for url in urls {
         xml.push_str("  <url>\n");
-        xml.push_str(&format!("    <loc>{}</loc>\n", escape_xml(url)));
+        let _ = writeln!(xml, "    <loc>{}</loc>", escape_xml(url));
         if cfg.include_lastmod {
-            xml.push_str(&format!("    <lastmod>{}</lastmod>\n", today));
+            let _ = writeln!(xml, "    <lastmod>{today}</lastmod>");
         }
-        xml.push_str(&format!(
-            "    <changefreq>{}</changefreq>\n",
-            cfg.change_freq
-        ));
-        xml.push_str(&format!("    <priority>{:.1}</priority>\n", cfg.priority));
+
+        let _ = writeln!(xml, "    <changefreq>{}</changefreq>", cfg.change_freq);
+        let _ = writeln!(xml, "    <priority>{:.1}</priority>", cfg.priority);
         xml.push_str("  </url>\n");
     }
 
@@ -285,17 +287,17 @@ fn get_today() -> String {
 fn epoch_secs_to_date(secs: u64) -> String {
     let days = secs / 86400;
     // Using the algorithm from https://www.researchgate.net/publication/316558298
-    let z = days + 719468;
-    let era = z / 146097;
-    let doe = z - era * 146097;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let z = days + 719_468;
+    let era = z / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
     let y = yoe + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
-    format!("{:04}-{:02}-{:02}", y, m, d)
+    format!("{y:04}-{m:02}-{d:02}")
 }
 
 // ─── Main logic ──────────────────────────────────────────────────────────────
@@ -311,10 +313,9 @@ fn run() -> Result<()> {
         // We skip for "test" and "markdown" since sitemap only makes sense for HTML.
         if renderer == "html" || renderer == "sitemap" {
             std::process::exit(0);
-        } else {
-            // For any other renderer, we still support being a co-backend.
-            std::process::exit(1);
         }
+        // For any other renderer, we still support being a co-backend.
+        std::process::exit(1);
     }
 
     // Normal invocation: read RenderContext from stdin.
@@ -349,7 +350,7 @@ fn run() -> Result<()> {
             if u.ends_with('/') {
                 u.to_string()
             } else {
-                format!("{}/", u)
+                format!("{u}/")
             }
         }
         None => {
@@ -409,10 +410,7 @@ fn run() -> Result<()> {
     if let Some(html_dir) = html_dest {
         let html_sitemap = html_dir.join(&cfg.output_filename);
         if let Err(e) = fs::copy(&output_path, &html_sitemap) {
-            eprintln!(
-                "[mdbook-sitemap] Note: could not copy sitemap to html dir: {}",
-                e
-            );
+            eprintln!("[mdbook-sitemap] Note: could not copy sitemap to html dir: {e}");
         } else {
             eprintln!("[mdbook-sitemap] Also copied → {}", html_sitemap.display());
         }
@@ -423,7 +421,7 @@ fn run() -> Result<()> {
 
 fn main() {
     if let Err(e) = run() {
-        eprintln!("[mdbook-sitemap] Error: {:?}", e);
+        eprintln!("[mdbook-sitemap] Error: {e:?}");
         std::process::exit(1);
     }
 }
@@ -476,9 +474,9 @@ mod tests {
     #[test]
     fn test_epoch_secs_to_date() {
         // 2024-01-01 00:00:00 UTC = 1704067200
-        assert_eq!(epoch_secs_to_date(1704067200), "2024-01-01");
+        assert_eq!(epoch_secs_to_date(1_704_067_200), "2024-01-01");
         // 2000-01-01 = 946684800
-        assert_eq!(epoch_secs_to_date(946684800), "2000-01-01");
+        assert_eq!(epoch_secs_to_date(946_684_800), "2000-01-01");
         // Unix epoch
         assert_eq!(epoch_secs_to_date(0), "1970-01-01");
     }

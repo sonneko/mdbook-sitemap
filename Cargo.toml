@@ -10,6 +10,15 @@ readme = "README.md"
 keywords = ["mdbook", "sitemap", "seo", "documentation"]
 categories = ["command-line-utilities", "development-tools"]
 
+[lints.clippy]
+cargo = "deny"
+complexity = "deny"
+correctness = "deny"
+pedantic = "deny"
+perf = "deny"
+style = "deny"
+suspicious = "deny"
+
 [[bin]]
 name = "mdbook-sitemap"
 path = "src/main.rs"
