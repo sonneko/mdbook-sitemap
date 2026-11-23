@@ -79,7 +79,7 @@ runs:
             exit 1
           fi
           mv "$BIN_PATH" "$INSTALL_DIR/mdbook-sitemap"
-          chmod  x "$INSTALL_DIR/mdbook-sitemap"
+          chmod  +x "$INSTALL_DIR/mdbook-sitemap"
         else
           unzip -q "$ARCHIVE_PATH" -d "$UNPACK_DIR/extracted"
           BIN_PATH=$(find "$UNPACK_DIR/extracted" -name "mdbook-sitemap.exe" -type f | head -n 1)
