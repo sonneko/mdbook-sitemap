@@ -42,6 +42,18 @@ The configured `base-url` is included as the book homepage. The root
 `index.html` alias is omitted so that the homepage appears only once; duplicate
 chapter URLs are also de-duplicated.
 
+### GitHub Actions
+
+```
+uses: sonneko/mdbook-sitemap@v0.1.3
+```
+
+OR
+
+```
+uses: sonneko/mdbook-sitemap@latest
+```
+
 ### Licence
 
 MIT license

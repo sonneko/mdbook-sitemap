@@ -1,0 +1,83 @@
+name: 'Setup mdbook-sitemap'
+description: 'Install mdbook-sitemap binary from GitHub Releases for use with mdbook build'
+author: 'sonneko'
+
+branding:
+  icon: 'map'
+  color: 'orange'
+
+inputs:
+  version:
+    description: 'Version of mdbook-sitemap to install (e.g., v0.1.4 or latest)'
+    required: false
+    default: 'latest'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install mdbook-sitemap
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+
+        # following cargo-dist targets
+        OS="$(uname -s)"
+        ARCH="$(uname -m)"
+
+        case "$OS" in
+          Linux)
+            case "$ARCH" in
+              x86_64)  TARGET="x86_64-unknown-linux-gnu" ;;
+              aarch64) TARGET="aarch64-unknown-linux-gnu" ;;
+              *) echo "Unsupported Linux arch: $ARCH"; exit 1 ;;
+            esac
+            EXT="tar.xz"
+            ;;
+          Darwin)
+            case "$ARCH" in
+              x86_64) TARGET="x86_64-apple-darwin" ;;
+              arm64)  TARGET="aarch64-apple-darwin" ;;
+              *) echo "Unsupported macOS arch: $ARCH"; exit 1 ;;
+            esac
+            EXT="tar.xz"
+            ;;
+          MINGW*|MSYS*|CYGWIN*)
+            TARGET="x86_64-pc-windows-msvc"
+            EXT="zip"
+            ;;
+          *)
+            echo "Unsupported OS: $OS"
+            exit 1
+            ;;
+        esac
+
+        # resolve version
+        if [ "$VERSION" = "latest" ]; then
+          TAG=$(gh api repos/sonneko/mdbook-sitemap/releases/latest --jq '.tag_name')
+        else
+          TAG="$VERSION"
+        fi
+
+        INSTALL_DIR="$HOME/.mdbook-sitemap/bin"
+        mkdir -p "$INSTALL_DIR"
+
+        ASSET_NAME="mdbook-sitemap-${TARGET}.${EXT}"
+        URL="https://github.com/sonneko/mdbook-sitemap/releases/download/${TAG}/${ASSET_NAME}"
+
+        echo "Downloading ${URL}..."
+        curl -fsSL "$URL" -o "/tmp/${ASSET_NAME}"
+
+        if [ "$EXT" = "tar.xz" ]; then
+          tar -xf "/tmp/${ASSET_NAME}" -C "/tmp"
+          find /tmp -name "mdbook-sitemap" -type f -exec mv {} "$INSTALL_DIR/" \;
+          chmod  x "$INSTALL_DIR/mdbook-sitemap"
+        else
+          unzip -q "/tmp/${ASSET_NAME}" -d "/tmp/mdbook-sitemap-ext"
+          find /tmp/mdbook-sitemap-ext -name "mdbook-sitemap.exe" -type f -exec mv {} "$INSTALL_DIR/" \;
+        fi
+
+        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+        echo "Installed mdbook-sitemap (${TAG}) to $INSTALL_DIR"
