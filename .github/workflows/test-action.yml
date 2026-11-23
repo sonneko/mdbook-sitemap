@@ -12,7 +12,7 @@ jobs:
       - name: Setup mdbook-sitemap
         uses: ./
         with:
-          version: v0.1.4
+          version: v0.1.5
 
       - name: Verify binary
         run: mdbook-sitemap --version

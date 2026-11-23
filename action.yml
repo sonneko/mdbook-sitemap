@@ -8,7 +8,7 @@ branding:
 
 inputs:
   version:
-    description: 'Version of mdbook-sitemap to install (e.g., v0.1.4 or latest)'
+    description: 'Version of mdbook-sitemap to install (e.g., v0.1.5 or latest)'
     required: false
     default: 'latest'
 

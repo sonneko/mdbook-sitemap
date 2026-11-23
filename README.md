@@ -45,7 +45,7 @@ chapter URLs are also de-duplicated.
 ### GitHub Actions
 
 ```
-uses: sonneko/mdbook-sitemap@v0.1.4
+uses: sonneko/mdbook-sitemap@v0.1.5
 ```
 
 ### Licence
