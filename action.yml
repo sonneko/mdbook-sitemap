@@ -59,11 +59,8 @@ runs:
           TAG="$VERSION"
         fi
 
-        BASE_TMP="${RUNNER_TEMP:-/tmp}"
-        mkdir -p "$BASE_TMP"
-
         INSTALL_DIR="$HOME/.mdbook-sitemap/bin"
-        UNPACK_DIR="$(mktemp -d "$BASE_TMP/mdbook-sitemap-XXXXXX")"
+        UNPACK_DIR="$(mktemp -d)"
         ARCHIVE_PATH="${UNPACK_DIR}/archive.${EXT}"
 
         mkdir -p "$INSTALL_DIR"
@@ -94,12 +91,5 @@ runs:
         fi
 
         rm -rf "$UNPACK_DIR"
-
-        if command -v cygpath >/dev/null 2>&1; then
-          WIN_INSTALL_DIR="$(cygpath -w "$INSTALL_DIR")"
-          echo "$WIN_INSTALL_DIR" >> "$GITHUB_PATH"
-        else
-          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
-        fi
-
+        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
         echo "Installed mdbook-sitemap (${TAG}) to $INSTALL_DIR"
