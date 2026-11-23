@@ -59,8 +59,11 @@ runs:
           TAG="$VERSION"
         fi
 
+        BASE_TMP="${RUNNER_TEMP:-/tmp}"
+        mkdir -p "$BASE_TMP"
+
         INSTALL_DIR="$HOME/.mdbook-sitemap/bin"
-        UNPACK_DIR="$(mktemp -d)"
+        UNPACK_DIR="$(mktemp -d "$BASE_TMP/mdbook-sitemap-XXXXXX")"
         ARCHIVE_PATH="${UNPACK_DIR}/archive.${EXT}"
 
         mkdir -p "$INSTALL_DIR"
@@ -79,7 +82,7 @@ runs:
             exit 1
           fi
           mv "$BIN_PATH" "$INSTALL_DIR/mdbook-sitemap"
-          chmod +x "$INSTALL_DIR/mdbook-sitemap"
+          chmod  x "$INSTALL_DIR/mdbook-sitemap"
         else
           unzip -q "$ARCHIVE_PATH" -d "$UNPACK_DIR/extracted"
           BIN_PATH=$(find "$UNPACK_DIR/extracted" -name "mdbook-sitemap.exe" -type f | head -n 1)
@@ -91,5 +94,12 @@ runs:
         fi
 
         rm -rf "$UNPACK_DIR"
-        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+
+        if command -v cygpath >/dev/null 2>&1; then
+          WIN_INSTALL_DIR="$(cygpath -w "$INSTALL_DIR")"
+          echo "$WIN_INSTALL_DIR" >> "$GITHUB_PATH"
+        else
+          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+        fi
+
         echo "Installed mdbook-sitemap (${TAG}) to $INSTALL_DIR"
