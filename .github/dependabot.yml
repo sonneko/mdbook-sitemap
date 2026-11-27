@@ -12,6 +12,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    group:
+    groups:
       all-dependencies:
         patterns: ["*"]
