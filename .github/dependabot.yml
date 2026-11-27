@@ -6,7 +6,7 @@ updates:
       interval: "weekly"
     groups:
       all-dependencies:
-        patterns: "*"
+        patterns: ["*"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -14,4 +14,4 @@ updates:
       interval: "weekly"
     group:
       all-dependencies:
-        patterns: "*"
+        patterns: ["*"]
