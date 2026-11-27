@@ -25,7 +25,7 @@ jobs:
       DIST_TAG: ${{ fromJson(inputs.plan).announcement_tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -36,7 +36,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2.9.3
       - name: Install mdBook
-        uses: taiki-e/install-action@v2.90.3
+        uses: taiki-e/install-action@v2.90.8
         with:
           tool: mdbook@0.5.4
           fallback: none
